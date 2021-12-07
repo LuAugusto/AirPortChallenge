@@ -1,13 +1,13 @@
 import requests
 
-#os.system('clear')
-apikey = 'qEbvlDxInweeAIjmOzEl9vKKKMrdkvLV'
+class Request():
+    def __init__(self):
+        self.apikey = 'qEbvlDxInweeAIjmOzEl9vKKKMrdkvLV'
+        self.url = 'http://stub.2xt.com.br/air/search/{}/POA/MAO/2022-06-12'.format(apikey)
+        self.username = 'test'
+        self.senha = 'tB7vlD'
 
-url = 'http://stub.2xt.com.br/air/search/{}/POA/MAO/2022-06-12'.format(apikey)
-username = 'test'
-senha = 'tB7vlD'
-
-r = requests.get(url=url, auth=(username,senha))
-
-data = r.json()
-print(data)
+    def requestApi(self):
+        result = requests.get(url=self.url, auth=(self.username, self.senha))
+        data = result.json()
+        return data
