@@ -5,8 +5,36 @@ from datetime import datetime
 from main import server
 from request import Request
 from haversine import haversine, Unit
-
+from itertools import product
 app, api = server.app, server.api
+
+def combineFlights(data):
+    dataVolta = data.get('volta').get('options')
+    dataIda = data.get('ida').get('options')
+
+    all_combines = list(product(dataIda, dataVolta))
+
+    combinesDict = []
+
+    for item in all_combines:
+        arrival_time = item[0].get('arrival_time')
+        aircraft = item[0].get('aircraft')
+        departure_time = item[0].get('departure_time')
+        arrival_time1 = item[1].get('arrival_time')
+        aircraft1 = item[1].get('aircraft')
+        departure_time1 = item[1].get('departure_time')
+        fare = item[0].get('price').get('fare') + item[1].get('price').get('fare')
+        total = item[0].get('price').get('total') + item[1].get('price').get('total')
+        fees = item[0].get('price').get('fees') + item[1].get('price').get('fees')
+        price = {'fare':fare, 'total':total, 'fees':fees}
+
+        result = {'Ida':{'arrival_time':arrival_time, 'aircraft':aircraft, 'departure_time':departure_time},
+                  'volta':{ 'arrival_time1':arrival_time1, 'aircraft1':aircraft1, 'departure_time1':departure_time1}, 'precoTotal':price}
+
+        combinesDict.append({'combine':result})
+    print(combinesDict)
+    return combinesDict
+
 
 def priceTicket(item):
    if item.get('volta'):
@@ -164,6 +192,8 @@ class ApiAirport(Resource):
             return ({'error': 'iata inexistente'}, 400)
 
         priceValue = priceTicket(dataVoo)
-        responseData = metaTicket(priceValue)
+        metaValue = metaTicket(priceValue)
+
+        responseData = combineFlights(metaValue)
 
         return responseData
