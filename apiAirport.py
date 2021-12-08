@@ -4,16 +4,137 @@ from flask import Response
 from datetime import datetime
 from main import server
 from request import Request
+from haversine import haversine, Unit
 
 app, api = server.app, server.api
 
-def verifyIata(iataOrigem, iataVolta, dataIda, dataVolta):
+def priceTicket(item):
+   if item.get('volta'):
+       for itemValue in item.get('volta').get('options'):
+           feesValue = itemValue['price'].get('fees')
+           fareValue = itemValue['price'].get('fare')
+
+           price = round((fareValue * 10) / 100)
+           feesCalc = round(price if price > 40 else price)
+           total = round(fareValue + feesCalc)
+
+           result = {'fare': fareValue, 'total': total, 'fees': feesCalc}
+
+           itemValue['price'] = result
+
+       for itemValue in item.get('ida').get('options'):
+           feesValue = itemValue['price'].get('fees')
+           fareValue = itemValue['price'].get('fare')
+
+           price = round((fareValue * 10) / 100)
+           feesCalc = round(price if price > 40 else price)
+           total = round(fareValue + feesCalc)
+
+           result = {'fare': fareValue, 'total': total, 'fees': feesCalc}
+
+           itemValue['price'] = result
+
+       return item
+
+   else:
+       for itemValue in item.get('ida').get('options'):
+           feesValue = itemValue['price'].get('fees')
+           fareValue = itemValue['price'].get('fare')
+
+           price = round((fareValue * 10) / 100)
+           feesCalc = round(price if price > 40 else price)
+           total = round(fareValue + feesCalc)
+
+           result = {'fare': fareValue, 'total': total, 'fees': feesCalc}
+
+           itemValue['price'] = result
+
+       return item
+
+def metaTicket(item):
+    if item.get('volta'):
+        summary = item.get('volta').get('summary')
+        latFrom = summary.get('from').get('lat')
+        lonFrom = summary.get('from').get('lon')
+        latTo = summary.get('to').get('lat')
+        lonTo = summary.get('to').get('lon')
+
+        summaryIda = item.get('ida').get('summary')
+        latFromIda = summary.get('from').get('lat')
+        lonFromIda = summary.get('from').get('lon')
+        latToIda = summary.get('to').get('lat')
+        lonToIda = summary.get('to').get('lon')
+
+        for itemValue in item.get('volta').get('options'):
+            arrival_time = str(itemValue.get('arrival_time'))
+            departure_time = str(itemValue.get('departure_time'))
+
+            date1 = datetime.strptime(arrival_time, '%Y-%m-%dT%H:%M:%S')
+            date2 = datetime.strptime(departure_time, '%Y-%m-%dT%H:%M:%S')
+
+            subDate = str(date1 - date2)
+            speedCalc = subDate.split(':',1)
+
+            range = round(haversine((latFrom, lonFrom),(latTo, lonTo)))
+            cost_per_km = itemValue['price'].get('fare') / range
+            cruise_speed_kmh = round(range / int(speedCalc[0]))
+
+            result = {'cost_per_km': cost_per_km, 'range': range, 'cruise_speed_kmh': cruise_speed_kmh}
+
+            itemValue['meta'] = result
+
+        for itemValue in item.get('ida').get('options'):
+            arrival_time = str(itemValue.get('arrival_time'))
+            departure_time = str(itemValue.get('departure_time'))
+
+            date1 = datetime.strptime(arrival_time, '%Y-%m-%dT%H:%M:%S')
+            date2 = datetime.strptime(departure_time, '%Y-%m-%dT%H:%M:%S')
+
+            subDate = str(date1 - date2)
+            speedCalc = subDate.split(':',1)
+
+            range = round(haversine((latFrom, lonFrom),(latTo, lonTo)))
+            cost_per_km = itemValue['price'].get('fare') / range
+            cruise_speed_kmh = round(range / int(speedCalc[0]))
+
+            result = {'cost_per_km': cost_per_km, 'range': range, 'cruise_speed_kmh': cruise_speed_kmh}
+
+            itemValue['meta'] = result
+
+        return item
+
+    else:
+        summaryIda = item.get('ida').get('summary')
+        latFromIda = summaryIda.get('from').get('lat')
+        lonFromIda = summaryIda.get('from').get('lon')
+        latToIda = summaryIda.get('to').get('lat')
+        lonToIda = summaryIda.get('to').get('lon')
+
+        for itemValue in item.get('ida').get('options'):
+            arrival_time = str(itemValue.get('arrival_time'))
+            departure_time = str(itemValue.get('departure_time'))
+
+            date1 = datetime.strptime(arrival_time, '%Y-%m-%dT%H:%M:%S')
+            date2 = datetime.strptime(departure_time, '%Y-%m-%dT%H:%M:%S')
+
+            subDate = str(date1 - date2)
+            speedCalc = subDate.split(':',1)
+
+            range = round(haversine((latFromIda, lonFromIda),(latToIda, lonToIda)))
+            cost_per_km = itemValue['price'].get('fare') / range
+            cruise_speed_kmh = round(range / int(speedCalc[0]))
+
+            result = {'cost_per_km': cost_per_km, 'range': range, 'cruise_speed_kmh': cruise_speed_kmh}
+
+            itemValue['meta'] = result
+
+        return item
+
+def verifyIata(dataIda, dataVolta):
     date1 = datetime.strptime(dataIda, '%Y-%m-%d').date()
     date2 = datetime.strptime(dataVolta, '%Y-%m-%d').date()
 
-    if iataOrigem == iataVolta:
-        return False
-    elif date2 <= date1:
+    if date2 <= date1:
         return False
 
 @api.route('/voo/<iataOrigem>/<iataDestino>/<dataIda>', defaults={"dataVolta":None})
@@ -24,11 +145,16 @@ class ApiAirport(Resource):
         destino = str(iataDestino)
         ida = str(dataIda)
         volta = str(dataVolta) if dataVolta else None
+        verifyData = True
 
-        verifyData = verifyIata(origem, destino, ida, volta)
+        if volta != None:
+            verifyData = verifyIata(ida, volta)
+
+        if origem == destino:
+            return ({'error':'Origem e destino iguais'}, 400)
 
         if verifyData == False:
-            return ({'error':'Origem e destino iguais'}, 400)
+            return ({'error':'data de ida e volta iguais'}, 400)
 
         data = Request(origem,destino, ida, volta)
 
@@ -37,4 +163,7 @@ class ApiAirport(Resource):
         if dataVoo == False:
             return ({'error': 'iata inexistente'}, 400)
 
-        return dataVoo
+        priceValue = priceTicket(dataVoo)
+        responseData = metaTicket(priceValue)
+
+        return responseData
