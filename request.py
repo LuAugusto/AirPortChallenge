@@ -32,7 +32,7 @@ class Request():
 
         if self.dataVolta == None:
             result = requests.get(url, auth=(self.username, self.senha))
-            data = result.json() if result else None
+            data = {'ida': result.json() if result else None}
             return data
 
         else:
